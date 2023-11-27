@@ -1,0 +1,354 @@
+import numpy as np
+from numpy import sqrt
+import matplotlib.pyplot as plt
+from scipy import integrate
+from scipy.integrate import solve_ivp, simpson
+from scipy.constants import hbar
+import scipy as sp
+
+L = 30       #width of a single well  
+gamma  = 50 #absolute value of the depth of the well / unitless 
+x1 = np.linspace(0-1, 2*L+1, 11)
+
+def V(x, V0=-gamma): #construction of wells 
+    if np.iterable(x):
+        return np.array([V(xi, V0) for xi in x])
+    elif x < 0:
+        return 0
+    elif x >= 0 and x < L:
+        return -gamma
+    elif x >= L and x < 2*L:
+        return -gamma
+    elif x > 2*L:
+        return 0
+    
+x1_plot = np.linspace(x1.min(), x1.max(), 10000)
+print (plt.ylim(-gamma - 1, 0 + 2))
+plt.plot(x1_plot, V(x1_plot))
+plt.title("fig.1: Infinite well")
+
+L = 1e-9
+m = 9.11e-31
+k = (2*m) / (hbar**2)
+n = 1
+
+En = ((n**2) * (np.pi**2) * (hbar**2)) / (2 * m * (L**2))
+xmin = -L/2
+xmax = L/2
+npts = 1000
+x_eval = np.linspace(xmin, xmax, npts)
+
+psi_left = 0
+dpsi_left = 1
+values_list = []
+def derivative_schro(x, psi, E):
+    psi0, psi1 = psi
+    dpsi1 = -k * psi0 * E
+    return (psi1, dpsi1)
+
+RK4_solution = solve_ivp(derivative_schro, (xmin, xmax), [psi_left, dpsi_left], t_eval = x_eval, args = (En, ))
+plt.plot(RK4_solution.t, RK4_solution.y[0])
+plt.title("fig.2: First energy level for infinite well")
+
+energy_list = []
+amp_list = []
+for i in range(50):
+    En = i*(1e-19)
+    energy_list.append(En)
+    sol = solve_ivp(derivative_schro, (xmin, xmax), [psi_left, dpsi_left], t_eval = x_eval, args = (En, ))
+    amp_list.append(sol.y[0][-1])
+    
+plt.plot(energy_list, amp_list)
+plt.grid()
+plt.title("fig.3: Amplitude vs Energy (infinite well)")
+
+def right_boundary(E):
+    psi_left = 0
+    dpsi_left = 1
+    solution = solve_ivp(derivative_schro, (xmin, xmax), [psi_left, dpsi_left], t_eval = x_eval, args = (E, ))
+    return solution.y[0][-1]
+
+def bisection_step(f, bounds):
+    """Performs one step of the bisection algorithm to locate a root of f,
+    and returns a smaller range in which the root is found.
+
+    f: function of a single variable with a root within bounds
+    bounds: tuple of two numbers representing the range to search for the root"""
+
+    lower, upper = bounds      # "Unpack" the tuple so that we can manipulate the lower and upper bound separately
+    middle = (lower + upper)/2 # Calculate the midpoint
+
+    if f(lower)*f(middle) <0: # We want this code to run if f(l) and f(m) have opposite signs. Fill in the condition here
+        return (lower, middle)
+    else:
+        return (middle, upper)
+    
+print("{:^20}  {:^25}  {:^20}  {:^14}".format("lower", "upper", "upper-lower", "iterations"))
+l, u = 0.01e-18, 0.1e-18
+iterations = 0
+while u - l > 1e-22:
+    l, u = bisection_step(right_boundary, (l, u))
+    iterations = iterations + 1
+    print("{:15.20f}  {:15.20f}  {:15.20f}  {:15.20f}".format(l, u, u-l, iterations))
+    
+print("{:^20}  {:^25}  {:^20}  {:^14}".format("lower", "upper", "upper-lower", "iterations"))
+l, u = 0.2e-18, 0.4e-18
+iterations = 0
+while u - l > 1e-22:
+    l, u = bisection_step(right_boundary, (l, u))
+    iterations = iterations + 1
+    print("{:15.20f}  {:15.20f}  {:15.20f}  {:15.20f}".format(l, u, u-l, iterations))
+    
+print("{:^20}  {:^25}  {:^20}  {:^14}".format("lower", "upper", "upper-lower", "iterations"))
+l, u = 0.5e-18, 0.75e-18
+iterations = 0
+while u - l > 1e-22:
+    l, u = bisection_step(right_boundary, (l, u))
+    iterations = iterations + 1
+    print("{:15.20f}  {:15.20f}  {:15.20f}  {:15.20f}".format(l, u, u-l, iterations))
+
+    D = 10     #width of the box  
+L = 30       #width of a single well  
+gamma  = 50 #absolute value of the depth of the well / unitless 
+gamma1 = 0
+x1 = np.linspace(0-1, 2*L+D+1, 11)
+
+def V(x, V0=-gamma,V1 = -gamma1): #construction of wells 
+    if np.iterable(x):
+        return np.array([V(xi, V0) for xi in x])
+    elif x < 0:
+        return 0
+    elif x >= 0 and x < L:
+        return -gamma
+    elif x >= D and x < L + D:
+        return -gamma/2
+    elif x >= L + D and x < 2*L + D:
+        return -gamma
+    elif x > 2*L + D:
+        return 0
+    
+x1_plot = np.linspace(x1.min(), x1.max(), 1000)
+print (plt.ylim(-gamma - 1, 0 + 2))
+plt.plot(x1_plot, V(x1_plot))
+plt.title("fig.4: infinite well with a potential box in the middle")
+
+def derivative_schro_pot(x, psi, E, V):
+    psi0, psi1 = psi
+    dpsi1 = -k * psi0 * (E - V)  
+    return (psi1, dpsi1)
+
+L = 1e-9
+xmin = -L/2
+xmax = L/2
+xmin_well = -L/8
+xmax_well = L/8
+npts = 1000
+first_well = np.linspace(xmin, xmin_well, npts)
+first_well_V = 0
+box = np.linspace(xmin_well, xmax_well)
+box_V = 2e-19
+second_well = np.linspace(xmax_well, xmax, npts)
+second_well_V = 0
+energy_values = np.linspace(0.01, 1000, npts)
+psi_left = 0
+dpsi_left = 1
+
+energy_list_box = []
+amp_list_box = []
+for e in energy_values:
+    En = e*(1e-19)
+    energy_list_box.append(En)
+    sol_first_well = solve_ivp(derivative_schro_pot, (xmin, xmin_well), [psi_left, dpsi_left], t_eval = first_well, args = (En, first_well_V))
+    sol_box = solve_ivp(derivative_schro_pot, (xmin_well, xmax_well), [sol_first_well.y[0][-1], sol_first_well.y[1][-1]], t_eval = box, args = (En, box_V))
+    sol_second_well = solve_ivp(derivative_schro_pot, (xmax_well, xmax), [sol_box.y[0][-1], sol_box.y[1][-1]], t_eval = second_well, args = (En, second_well_V))
+    amp_list_box.append(sol_second_well.y[0][-1])
+
+
+plt.plot(energy_list_box, amp_list_box)
+plt.grid()
+plt.title("fig.5: Amplitude vs Energy (infinite well with potential box)")
+
+plt.plot(energy_list_box, amp_list_box)
+plt.grid()
+plt.xlim(0, 0.2*1e-17)
+plt.title("fig.6: Amplitude vs Energy zoomed (infinite well with potential box)")
+
+def right_boundary_box(E):
+    psi_left = 0
+    dpsi_left = 1
+    sol_first_well = solve_ivp(derivative_schro_pot, (xmin, xmin_well), [psi_left, dpsi_left], t_eval = first_well, args = (E, first_well_V))
+    sol_box = solve_ivp(derivative_schro_pot, (xmin_well, xmax_well), [sol_first_well.y[0][-1], sol_first_well.y[1][-1]], t_eval = box, args = (E, box_V))
+    sol_second_well = solve_ivp(derivative_schro_pot, (xmax_well, xmax), [sol_box.y[0][-1], sol_box.y[1][-1]], t_eval = second_well, args = (E, second_well_V))
+    return sol_second_well.y[0][-1]
+
+def bisection_step_box(f, bounds):
+    """Performs one step of the bisection algorithm to locate a root of f,
+    and returns a smaller range in which the root is found.
+
+    f: function of a single variable with a root within bounds
+    bounds: tuple of two numbers representing the range to search for the root"""
+
+    lower, upper = bounds      # "Unpack" the tuple so that we can manipulate the lower and upper bound separately
+    middle = (lower + upper)/2 # Calculate the midpoint
+
+    if f(lower)*f(middle) <0: # We want this code to run if f(l) and f(m) have opposite signs. Fill in the condition here
+        return (lower, middle)
+    else:
+        return (middle, upper)
+    
+print("{:^20}  {:^25}  {:^20}  {:^14}".format("lower", "upper", "upper-lower", "iterations"))
+l, u = 0.1e-18, 0.23e-18
+iterations = 0
+while u - l > 1e-22:
+    l, u = bisection_step_box(right_boundary_box, (l, u))
+    iterations = iterations + 1
+    print("{:15.20f}  {:15.20f}  {:15.20f}  {:15.20f}".format(l, u, u-l, iterations))
+    
+print("{:^20}  {:^25}  {:^20}  {:^14}".format("lower", "upper", "upper-lower", "iterations"))
+l, u = 0.23e-18, 0.3e-18
+iterations = 0
+while u - l > 1e-22:
+    l, u = bisection_step_box(right_boundary_box, (l, u))
+    iterations = iterations + 1
+    print("{:15.20f}  {:15.20f}  {:15.20f}  {:15.20f}".format(l, u, u-l, iterations))
+    
+print("{:^20}  {:^25}  {:^20}  {:^14}".format("lower", "upper", "upper-lower", "iterations"))
+l, u = 0.50e-18, 0.75e-18
+iterations = 0
+while u - l > 1e-22:
+    l, u = bisection_step_box(right_boundary_box, (l, u))
+    iterations = iterations + 1
+    print("{:15.20f}  {:15.20f}  {:15.20f}  {:15.20f}".format(l, u, u-l, iterations))
+
+L = 1e-9
+m = 9.11e-31
+En1 = 0.00000000000000000006
+n1 = sqrt((2 * m * (L**2) * En1) / ((np.pi**2) * (hbar**2)))
+print (n1)
+
+L = 1e-9
+m = 9.11e-31
+En2 = 0.00000000000000000024
+n2 = sqrt((2 * m * (L**2) * En2) / ((np.pi**2) * (hbar**2)))
+print (n2)
+
+L = 1e-9
+m = 9.11e-31
+En3 = 0.00000000000000000054
+n3 = sqrt((2 * m * (L**2) * En3) / ((np.pi**2) * (hbar**2)))
+print (n3)
+
+L = 1e-9
+m = 9.11e-31
+En1 = 0.00000000000000000014
+n1 = sqrt((2 * m * (L**2) * En1) / ((np.pi**2) * (hbar**2)))
+print (n1)
+
+L = 1e-9
+m = 9.11e-31
+En2 = 0.00000000000000000026
+n2 = sqrt((2 * m * (L**2) * En2) / ((np.pi**2) * (hbar**2)))
+print (n2)
+
+L = 1e-9
+m = 9.11e-31
+En3 = 0.00000000000000000062
+n3 = sqrt((2 * m * (L**2) * En3) / ((np.pi**2) * (hbar**2)))
+print (n3)
+
+solution_En1 = solve_ivp(derivative_schro, (xmin, xmax), [psi_left, dpsi_left], t_eval = x_eval, args = (0.00000000000000000006, ))
+plt.plot (solution_En1.t, solution_En1.y[0])
+
+solution_En2 = solve_ivp(derivative_schro, (xmin, xmax), [psi_left, dpsi_left], t_eval = x_eval, args = (0.00000000000000000024, ))
+plt.plot (solution_En2.t, solution_En2.y[0])
+
+solution_En3 = solve_ivp(derivative_schro, (xmin, xmax), [psi_left, dpsi_left], t_eval = x_eval, args = (0.00000000000000000054, ))
+plt.plot (solution_En3.t, solution_En3.y[0])
+plt.grid()
+plt.title("fig.7: Energy levels (infinite well)")
+
+sol_first_well = solve_ivp(derivative_schro_pot, (xmin, xmin_well), [psi_left, dpsi_left], t_eval = first_well, args = (0.00000000000000000014, first_well_V))
+sol_box = solve_ivp(derivative_schro_pot, (xmin_well, xmax_well), [sol_first_well.y[0][-1], sol_first_well.y[1][-1]], t_eval = box, args = (0.00000000000000000014, box_V))
+sol_second_well = solve_ivp(derivative_schro_pot, (xmax_well, xmax), [sol_box.y[0][-1], sol_box.y[1][-1]], t_eval = second_well, args = (0.00000000000000000014, second_well_V))
+plt.plot (sol_first_well.t, sol_first_well.y[0])
+plt.plot (sol_box.t, sol_box.y[0])
+plt.plot (sol_second_well.t, sol_second_well.y[0])
+plt.grid()
+
+sol_first_well = solve_ivp(derivative_schro_pot, (xmin, xmin_well), [psi_left, dpsi_left], t_eval = first_well, args = (0.00000000000000000026, first_well_V))
+sol_box = solve_ivp(derivative_schro_pot, (xmin_well, xmax_well), [sol_first_well.y[0][-1], sol_first_well.y[1][-1]], t_eval = box, args = (0.00000000000000000026, box_V))
+sol_second_well = solve_ivp(derivative_schro_pot, (xmax_well, xmax), [sol_box.y[0][-1], sol_box.y[1][-1]], t_eval = second_well, args = (0.00000000000000000026, second_well_V))
+plt.plot (sol_first_well.t, sol_first_well.y[0])
+plt.plot (sol_box.t, sol_box.y[0])
+plt.plot (sol_second_well.t, sol_second_well.y[0])
+plt.grid()
+
+sol_first_well = solve_ivp(derivative_schro_pot, (xmin, xmin_well), [psi_left, dpsi_left], t_eval = first_well, args = (0.00000000000000000062, first_well_V))
+sol_box = solve_ivp(derivative_schro_pot, (xmin_well, xmax_well), [sol_first_well.y[0][-1], sol_first_well.y[1][-1]], t_eval = box, args = (0.00000000000000000062, box_V))
+sol_second_well = solve_ivp(derivative_schro_pot, (xmax_well, xmax), [sol_box.y[0][-1], sol_box.y[1][-1]], t_eval = second_well, args = (0.00000000000000000062, second_well_V))
+plt.plot (sol_first_well.t, sol_first_well.y[0])
+plt.plot (sol_box.t, sol_box.y[0])
+plt.plot (sol_second_well.t, sol_second_well.y[0])
+plt.grid()
+plt.title("fig.8: Energy levels (infinite well with potential box)")
+
+L = 1e-9
+xmin = -L/2
+xmax = L/2
+xmin_well = -L/8
+xmax_well = L/8
+npts = 1000
+first_well = np.linspace(xmin, xmin_well, npts)
+first_well_V = 0
+box = np.linspace(xmin_well, xmax_well)
+box_V = 0.5e-19
+second_well = np.linspace(xmax_well, xmax, npts)
+second_well_V = 0
+energy_values = np.linspace(0.01, 1000, npts)
+psi_left = 0
+dpsi_left = 1
+
+energy_list_box = []
+amp_list_box = []
+for e in energy_values:
+    En = e*(1e-19)
+    energy_list_box.append(En)
+    sol_first_well = solve_ivp(derivative_schro_pot, (xmin, xmin_well), [psi_left, dpsi_left], t_eval = first_well, args = (En, first_well_V))
+    sol_box = solve_ivp(derivative_schro_pot, (xmin_well, xmax_well), [sol_first_well.y[0][-1], sol_first_well.y[1][-1]], t_eval = box, args = (En, box_V))
+    sol_second_well = solve_ivp(derivative_schro_pot, (xmax_well, xmax), [sol_box.y[0][-1], sol_box.y[1][-1]], t_eval = second_well, args = (En, second_well_V))
+    amp_list_box.append(sol_second_well.y[0][-1])
+
+
+plt.plot(energy_list_box, amp_list_box)
+plt.xlim(0, 0.2*1e-17)
+plt.grid()
+plt.title("fig.9: Amplitude vs Energy zoomed (lowered potential)")
+
+print("{:^20}  {:^25}  {:^20}  {:^14}".format("lower", "upper", "upper-lower", "iterations"))
+l, u = 0.0e-18, 0.2e-18
+iterations = 0
+while u - l > 1e-22:
+    l, u = bisection_step_box(right_boundary_box, (l, u))
+    iterations = iterations + 1
+    print("{:15.20f}  {:15.20f}  {:15.20f}  {:15.20f}".format(l, u, u-l, iterations))
+
+solution_En1 = solve_ivp(derivative_schro, (xmin, xmax), [psi_left, dpsi_left], t_eval = x_eval, args = (0.00000000000000000006, ))
+plt.plot (solution_En1.t, solution_En1.y[0], label="V = 0", color="b")
+
+sol_first_well = solve_ivp(derivative_schro_pot, (xmin, xmin_well), [psi_left, dpsi_left], t_eval = first_well, args = (0.00000000000000000008, first_well_V))
+sol_box = solve_ivp(derivative_schro_pot, (xmin_well, xmax_well), [sol_first_well.y[0][-1], sol_first_well.y[1][-1]], t_eval = box, args = (0.00000000000000000008, box_V))
+sol_second_well = solve_ivp(derivative_schro_pot, (xmax_well, xmax), [sol_box.y[0][-1], sol_box.y[1][-1]], t_eval = second_well, args = (0.00000000000000000008, second_well_V))
+plt.plot (sol_first_well.t, sol_first_well.y[0], color = "k")
+plt.plot (sol_box.t, sol_box.y[0], color = "k")
+plt.plot (sol_second_well.t, sol_second_well.y[0], label="V = 0.5e-19", color = "k")
+plt.grid()
+
+sol_first_well = solve_ivp(derivative_schro_pot, (xmin, xmin_well), [psi_left, dpsi_left], t_eval = first_well, args = (0.00000000000000000014, first_well_V))
+sol_box = solve_ivp(derivative_schro_pot, (xmin_well, xmax_well), [sol_first_well.y[0][-1], sol_first_well.y[1][-1]], t_eval = box, args = (0.00000000000000000014, box_V))
+sol_second_well = solve_ivp(derivative_schro_pot, (xmax_well, xmax), [sol_box.y[0][-1], sol_box.y[1][-1]], t_eval = second_well, args = (0.00000000000000000014, second_well_V))
+plt.plot (sol_first_well.t, sol_first_well.y[0], color = "r")
+plt.plot (sol_box.t, sol_box.y[0], color = "r")
+plt.plot (sol_second_well.t, sol_second_well.y[0], label="V = 2e-19", color = "r")
+plt.grid()
+plt.legend()
+plt.title("fig.10: Comparison of the ground states")
